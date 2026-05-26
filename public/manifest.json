@@ -1,0 +1,26 @@
+{
+  "name": "ParkShare",
+  "short_name": "ParkShare",
+  "description": "Alternate side parking tracker for NYC roommates",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FAF8F4",
+  "theme_color": "#2D3561",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["utilities", "navigation"],
+  "screenshots": []
+}
