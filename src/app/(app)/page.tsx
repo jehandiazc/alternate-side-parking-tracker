@@ -2,57 +2,128 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { MapPin, Bell, Clock, Sparkles, AlertCircle, Navigation } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { MapPin, Bell, Clock, Sparkles, AlertCircle, Navigation, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { formatMoveTime, formatCountdown } from "@/lib/utils";
-import type { ParkingStatus } from "@/types";
+import { createClient } from "@/lib/supabase/client";
+import type { Car, ParkingLog } from "@/types";
 
-// Leaflet must be loaded client-side only — no SSR
 const ParkingMap = dynamic(() => import("@/components/app/ParkingMap"), {
   ssr: false,
   loading: () => <div className="w-full h-full bg-[#e8e0d0] animate-pulse" />,
 });
 
-// ─── Mock data — replace with Supabase query in Phase 1 ──────────────────────
-const CAR_NAME = "The Civic";
-const LAT = 40.7831;
-const LNG = -73.9712;
-const STATUS: ParkingStatus = {
-  type: "parked",
-  log: {
-    id: "1",
-    car_id: "1",
-    logged_by: "1",
-    latitude: LAT,
-    longitude: LNG,
-    street_address: "W 84th St",
-    street_side: "N",
-    next_move_at: new Date(Date.now() + 1000 * 60 * 60 * 14).toISOString(),
-    is_active: true,
-    created_at: new Date().toISOString(),
-  },
-  moveAt: new Date(Date.now() + 1000 * 60 * 60 * 14),
-  isSuspended: false,
-};
-// ─────────────────────────────────────────────────────────────────────────────
+interface DashboardState {
+  status: "loading" | "no-car" | "no-log" | "parked";
+  car: Car | null;
+  log: ParkingLog | null;
+}
 
 export default function DashboardPage() {
-  const isParked = STATUS.type === "parked";
-  const moveAt   = isParked ? STATUS.moveAt : null;
-  const isSuspended = isParked ? STATUS.isSuspended : false;
-  const log      = isParked ? STATUS.log : null;
+  const router = useRouter();
+  const [state, setState] = useState<DashboardState>({
+    status: "loading",
+    car: null,
+    log: null,
+  });
 
+  useEffect(() => {
+    const supabase = createClient();
+
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push("/login"); return; }
+
+      // Get the user's first subscribed car
+      const { data: sub } = await supabase
+        .from("car_subscriptions")
+        .select("car_id, cars(*)")
+        .eq("user_id", user.id)
+        .limit(1)
+        .single();
+
+      if (!sub) {
+        setState({ status: "no-car", car: null, log: null });
+        return;
+      }
+
+      const car = (sub as unknown as { car_id: string; cars: Car }).cars;
+
+      // Get the active parking log for that car
+      const { data: log } = await supabase
+        .from("parking_logs")
+        .select("*")
+        .eq("car_id", car.id)
+        .eq("is_active", true)
+        .single();
+
+      setState({
+        status: log ? "parked" : "no-log",
+        car,
+        log: log ?? null,
+      });
+    }
+
+    load();
+
+    // Subscribe to real-time updates on parking_logs
+    const channel = supabase
+      .channel("parking_logs_changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "parking_logs" },
+        () => load()
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [router]);
+
+  // Derived values
+  const { car, log } = state;
+  const moveAt = log?.next_move_at ? new Date(log.next_move_at) : null;
   const hoursUntilMove = moveAt
     ? (moveAt.getTime() - Date.now()) / (1000 * 60 * 60)
     : Infinity;
   const isUrgent = hoursUntilMove > 0 && hoursUntilMove <= 2;
+  // Suspension check comes in Phase 3 (311 feed); placeholder for now
+  const isSuspended = false;
+
+  // ── Loading ──
+  if (state.status === "loading") {
+    return (
+      <div className="flex items-center justify-center h-[100dvh] bg-[--color-background]">
+        <Loader2 size={28} className="animate-spin text-[--color-primary]" />
+      </div>
+    );
+  }
+
+  // ── No car yet ──
+  if (state.status === "no-car") {
+    return (
+      <div className="flex flex-col items-center justify-center h-[100dvh] gap-4 px-6 bg-[--color-background] text-center">
+        <div className="text-5xl">🚗</div>
+        <h1 className="text-xl font-extrabold text-[--color-text-primary]">No car yet</h1>
+        <p className="text-sm text-[--color-text-secondary] max-w-xs">
+          Set up your first car to get started.
+        </p>
+        <Button variant="cta" size="lg" asChild>
+          <Link href="/setup"><MapPin size={18} /> Set up a car</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  const carName = car?.name ?? "Your car";
 
   return (
     <div className="relative w-full h-[100dvh]">
 
-      {/* ── Map — fills the entire screen, fully interactive ── */}
-      {isParked && log ? (
+      {/* ── Map ── */}
+      {log ? (
         <ParkingMap
           lat={log.latitude}
           lng={log.longitude}
@@ -62,20 +133,15 @@ export default function DashboardPage() {
         <div className="absolute inset-0 bg-[#e8e0d0] z-0" />
       )}
 
-      {/*
-        ── Overlay layer ──
-        pointer-events: none on the wrapper so all touches/clicks fall through
-        to the map. Re-enable pointer events only on the interactive elements.
-      */}
+      {/* ── Overlay ── */}
       <div className="absolute inset-0 z-10 pointer-events-none">
 
-        {/* Header — top of screen */}
+        {/* Header */}
         <div
           className="absolute top-0 inset-x-0 px-4 pb-12"
           style={{
             paddingTop: "max(env(safe-area-inset-top), 16px)",
-            background:
-              "linear-gradient(to bottom, rgba(26,26,46,0.5) 0%, transparent 100%)",
+            background: "linear-gradient(to bottom, rgba(26,26,46,0.5) 0%, transparent 100%)",
           }}
         >
           <div className="flex items-center justify-between max-w-lg mx-auto pt-2">
@@ -87,7 +153,6 @@ export default function DashboardPage() {
                 ParkShare
               </h1>
             </div>
-            {/* Re-enable pointer events for this button */}
             <button
               aria-label="Notification settings"
               className="pointer-events-auto w-9 h-9 rounded-full bg-white/15 backdrop-blur-sm border border-white/20 flex items-center justify-center text-white hover:bg-white/25 transition-colors"
@@ -97,7 +162,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* ── Floating status card — centred horizontally, above the bottom nav ── */}
+        {/* Floating card */}
         <div
           className="absolute inset-x-4 pointer-events-auto"
           style={{
@@ -114,14 +179,12 @@ export default function DashboardPage() {
               background: "rgba(250,248,244,0.94)",
               backdropFilter: "blur(16px)",
               WebkitBackdropFilter: "blur(16px)",
-              boxShadow:
-                "0 8px 32px rgba(26,26,46,0.18), 0 2px 8px rgba(26,26,46,0.10), 0 0 0 1px rgba(26,26,46,0.06)",
+              boxShadow: "0 8px 32px rgba(26,26,46,0.18), 0 2px 8px rgba(26,26,46,0.10), 0 0 0 1px rgba(26,26,46,0.06)",
             }}
           >
-            {isParked && log && moveAt ? (
+            {log && moveAt ? (
               <div className="p-4 space-y-3">
-
-                {/* Row 1 — street address + navigate */}
+                {/* Street + navigate */}
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[--color-primary-light] flex items-center justify-center">
@@ -129,7 +192,7 @@ export default function DashboardPage() {
                     </span>
                     <div className="min-w-0">
                       <p className="text-[10px] font-semibold text-[--color-text-muted] uppercase tracking-wide leading-none mb-0.5">
-                        {CAR_NAME} · parked on
+                        {carName} · parked on
                       </p>
                       <p className="text-sm font-bold text-[--color-text-primary] leading-tight truncate">
                         {log.street_address}
@@ -150,28 +213,19 @@ export default function DashboardPage() {
                   </a>
                 </div>
 
-                {/* Divider */}
                 <div className="border-t border-[--color-border]" />
 
-                {/* Row 2 — move deadline + badge */}
+                {/* Move deadline */}
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5">
-                    <span
-                      className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                        isSuspended
-                          ? "bg-[--color-success-light]"
-                          : isUrgent
-                          ? "bg-[--color-danger-light]"
-                          : "bg-[--color-accent-light]"
-                      }`}
-                    >
-                      {isSuspended ? (
-                        <Sparkles size={14} className="text-[#4a7a3a]" />
-                      ) : isUrgent ? (
-                        <AlertCircle size={14} className="text-[--color-danger]" />
-                      ) : (
-                        <Clock size={14} className="text-[--color-accent-hover]" />
-                      )}
+                    <span className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                      isSuspended ? "bg-[--color-success-light]"
+                      : isUrgent  ? "bg-[--color-danger-light]"
+                      : "bg-[--color-accent-light]"
+                    }`}>
+                      {isSuspended ? <Sparkles size={14} className="text-[#4a7a3a]" />
+                      : isUrgent   ? <AlertCircle size={14} className="text-[--color-danger]" />
+                      : <Clock size={14} className="text-[--color-accent-hover]" />}
                     </span>
                     <div>
                       <p className="text-[10px] font-semibold text-[--color-text-muted] uppercase tracking-wide leading-none mb-0.5">
@@ -182,7 +236,6 @@ export default function DashboardPage() {
                       </p>
                     </div>
                   </div>
-
                   {isSuspended ? (
                     <Badge variant="success"><Sparkles size={10} />Holiday!</Badge>
                   ) : isUrgent ? (
@@ -194,32 +247,24 @@ export default function DashboardPage() {
                   )}
                 </div>
 
-                {/* CTA */}
                 <Button variant="cta" size="lg" className="w-full" asChild>
-                  <Link href="/park">
-                    <MapPin size={18} />
-                    I Just Parked
-                  </Link>
+                  <Link href="/park"><MapPin size={18} />I Just Parked</Link>
                 </Button>
-
               </div>
             ) : (
-              /* Unknown state */
+              /* No active log */
               <div className="p-5 text-center space-y-3">
                 <p className="text-4xl">🚗</p>
                 <div>
                   <p className="font-bold text-[--color-text-primary]">
-                    Where&apos;s {CAR_NAME}?
+                    Where&apos;s {carName}?
                   </p>
                   <p className="text-sm text-[--color-text-secondary] mt-0.5">
                     Log the parking spot and we&apos;ll handle the rest.
                   </p>
                 </div>
                 <Button variant="cta" size="lg" className="w-full" asChild>
-                  <Link href="/park">
-                    <MapPin size={18} />
-                    Log Parking Location
-                  </Link>
+                  <Link href="/park"><MapPin size={18} />Log Parking Location</Link>
                 </Button>
               </div>
             )}
