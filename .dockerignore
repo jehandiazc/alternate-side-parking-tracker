@@ -1,0 +1,22 @@
+# Never copy these into the Docker build context
+node_modules
+.next
+.git
+.gitignore
+
+# Environment files — injected at runtime
+.env
+.env.*
+!.env.example
+
+# Dev/editor artifacts
+.DS_Store
+*.pem
+.vscode
+.idea
+*.swp
+
+# Docs/meta (not needed in the image)
+README.md
+CONTRIBUTING.md
+docker-compose*.yml

@@ -1,0 +1,21 @@
+# Development — hot reload, mounts source code as a volume
+# Usage: docker compose -f docker-compose.dev.yml up
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.local
+    environment:
+      - NODE_ENV=development
+    volumes:
+      # Mount source so edits reflect instantly without rebuilding
+      - .:/app
+      # Prevent host node_modules from overwriting the container's
+      - /app/node_modules
+      - /app/.next
+    restart: unless-stopped

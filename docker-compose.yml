@@ -1,0 +1,16 @@
+# Production — mirrors what runs in deployment
+# Usage: docker compose up --build
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.local        # copy .env.example → .env.local and fill in real values
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
