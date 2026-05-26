@@ -55,8 +55,10 @@ export default function ParkingMap({ lat, lng, className = "" }: ParkingMapProps
       zoom={17}
       zoomControl={false}
       attributionControl={false}
-      scrollWheelZoom={false}
+      scrollWheelZoom={true}
       dragging={true}
+      touchZoom={true}
+      doubleClickZoom={true}
       className={className}
       style={{ background: "#e8e0d0" }}   // warm fallback while tiles load
     >
