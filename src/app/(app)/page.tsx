@@ -2,13 +2,14 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MapPin, Bell, Clock, Sparkles, AlertCircle, Navigation, Loader2 } from "lucide-react";
+import { MapPin, Bell, BellOff, BellRing, Clock, Sparkles, AlertCircle, Navigation, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { formatMoveTime, formatCountdown } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import { PushNotificationManager, type PushNotifState } from "@/components/app/PushNotificationManager";
 import type { Car, ParkingLog } from "@/types";
 
 const ParkingMap = dynamic(() => import("@/components/app/ParkingMap"), {
@@ -29,6 +30,22 @@ export default function DashboardPage() {
     car: null,
     log: null,
   });
+
+  // Push notification state
+  const [notifState, setNotifState] = useState<PushNotifState>({
+    permission: "default",
+    subscribed: false,
+    loading: false,
+  });
+  const requestAndSubscribeRef = useRef<(() => Promise<void>) | null>(null);
+  const handleNotifReady = useCallback((fn: () => Promise<void>) => {
+    requestAndSubscribeRef.current = fn;
+  }, []);
+
+  const handleBellClick = useCallback(() => {
+    if (notifState.permission === "denied") return; // can't prompt again — browser blocks
+    requestAndSubscribeRef.current?.();
+  }, [notifState.permission]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -119,8 +136,29 @@ export default function DashboardPage() {
 
   const carName = car?.name ?? "Your car";
 
+  // Bell icon + aria-label based on notification permission state
+  const BellIcon =
+    notifState.permission === "granted"
+      ? BellRing
+      : notifState.permission === "denied"
+      ? BellOff
+      : Bell;
+  const bellLabel =
+    notifState.permission === "granted"
+      ? "Notifications enabled"
+      : notifState.permission === "denied"
+      ? "Notifications blocked — enable in browser settings"
+      : "Enable move reminders";
+  const bellActive = notifState.permission === "granted";
+
   return (
     <div className="relative w-full h-[100dvh]">
+
+      {/* Push notification manager — registers SW + handles permission */}
+      <PushNotificationManager
+        onStateChange={setNotifState}
+        onReady={handleNotifReady}
+      />
 
       {/* ── Map ── */}
       {log ? (
@@ -154,10 +192,23 @@ export default function DashboardPage() {
               </h1>
             </div>
             <button
-              aria-label="Notification settings"
-              className="pointer-events-auto w-9 h-9 rounded-full bg-white/15 backdrop-blur-sm border border-white/20 flex items-center justify-center text-white hover:bg-white/25 transition-colors"
+              aria-label={bellLabel}
+              title={bellLabel}
+              onClick={handleBellClick}
+              disabled={notifState.loading || notifState.permission === "denied"}
+              className={[
+                "pointer-events-auto w-9 h-9 rounded-full backdrop-blur-sm border flex items-center justify-center transition-colors",
+                bellActive
+                  ? "bg-[--color-accent] border-[--color-accent] text-white"
+                  : notifState.permission === "denied"
+                  ? "bg-white/10 border-white/20 text-white/40 cursor-not-allowed"
+                  : "bg-white/15 border-white/20 text-white hover:bg-white/25",
+              ].join(" ")}
             >
-              <Bell size={16} />
+              {notifState.loading
+                ? <Loader2 size={16} className="animate-spin" />
+                : <BellIcon size={16} />
+              }
             </button>
           </div>
         </div>

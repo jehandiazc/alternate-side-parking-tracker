@@ -38,9 +38,9 @@ export interface CarSubscription {
   id: string;
   car_id: string;
   user_id: string;
-  notify_night_before: boolean;   // 9 PM the night before
-  notify_two_hours_before: boolean;
-  notify_day_of_morning: boolean; // 7 AM same day
+  notify_night_before: boolean;     // 8 PM the night before
+  notify_two_hours_before: boolean; // 2 hours before move
+  notify_morning_of: boolean;       // 7 AM same day
   created_at: string;
   profile?: Profile;
 }
