@@ -4,59 +4,85 @@ import dynamic from "next/dynamic";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { reverseGeocode, fetchCleaningSchedule, nextMoveAt } from "@/lib/nyc-open-data";
+import {
+  reverseGeocode,
+  autoDetectSide,
+  fetchCleaningSchedule,
+  nextMoveAt,
+  type GeocodeResult,
+} from "@/lib/nyc-open-data";
 import { StreetSidePicker } from "@/components/app/StreetSidePicker";
 import { Button } from "@/components/ui/Button";
-import { MapPin, Loader2, Navigation, CheckCircle2 } from "lucide-react";
+import { MapPin, Loader2, Navigation, CheckCircle2, LocateOff } from "lucide-react";
 import type { StreetSide } from "@/types";
 
-// Map with a fixed crosshair — user moves the map, not the pin
 const ParkingMap = dynamic(() => import("@/components/app/ParkingMap"), {
   ssr: false,
   loading: () => <div className="w-full h-full bg-[#e8e0d0] animate-pulse" />,
 });
 
-// NYC default — Central Park West area
 const DEFAULT_LAT = 40.7831;
 const DEFAULT_LNG = -73.9712;
 
 export default function ParkPage() {
   const router = useRouter();
 
-  // Map center (follows GPS or user drag)
   const [lat, setLat] = useState(DEFAULT_LAT);
   const [lng, setLng] = useState(DEFAULT_LNG);
-  // Increment to programmatically fly the map to lat/lng (GPS hit, re-centre)
   const [flySeq, setFlySeq] = useState(0);
 
-  const [streetAddress, setStreetAddress] = useState("");
-  const [streetSide, setStreetSide]       = useState<StreetSide | null>(null);
+  // Full geocode result — gives us streetName for the DB and displayAddress for the UI
+  const [geocodeResult, setGeocodeResult] = useState<GeocodeResult | null>(null);
+  const [streetSide, setStreetSide] = useState<StreetSide | null>(null);
 
-  const [gpsStatus, setGpsStatus] = useState<"acquiring" | "ready" | "denied">("acquiring");
+  const [gpsStatus, setGpsStatus]         = useState<"acquiring" | "ready" | "denied">("acquiring");
   const [geocodeStatus, setGeocodeStatus] = useState<"idle" | "loading" | "done">("idle");
+  const [autoDetecting, setAutoDetecting] = useState(false);
   const [submitStatus, setSubmitStatus]   = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [errorMsg, setErrorMsg] = useState("");
+  const [errorMsg, setErrorMsg]           = useState("");
 
-  // Debounce reverse geocoding so we don't call Nominatim on every drag pixel
   const geocodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const geocode = useCallback(async (latVal: number, lngVal: number) => {
+  // Full geocode: get address + road centerline → auto-detect side
+  const geocodeAndDetect = useCallback(async (latVal: number, lngVal: number) => {
     setGeocodeStatus("loading");
-    const addr = await reverseGeocode(latVal, lngVal);
-    setStreetAddress(addr);
+    setAutoDetecting(true);
+    const result = await reverseGeocode(latVal, lngVal);
+    setGeocodeResult(result);
     setGeocodeStatus("done");
+
+    if (result.streetName) {
+      const detectedSide = autoDetectSide(latVal, lngVal, result);
+      setStreetSide(detectedSide);
+    }
+    setAutoDetecting(false);
+  }, []);
+
+  // Quick geocode (on map drag): just update the address display, don't re-detect side
+  const geocodeQuick = useCallback(async (latVal: number, lngVal: number) => {
+    setGeocodeStatus("loading");
+    const result = await reverseGeocode(latVal, lngVal);
+    setGeocodeResult(result);
+    setGeocodeStatus("done");
+    // Also re-detect side when the user drags to a new location
+    if (result.streetName) {
+      setAutoDetecting(true);
+      const detectedSide = autoDetectSide(latVal, lngVal, result);
+      setStreetSide(detectedSide);
+      setAutoDetecting(false);
+    }
   }, []);
 
   const scheduleGeocode = useCallback((latVal: number, lngVal: number) => {
     if (geocodeTimer.current) clearTimeout(geocodeTimer.current);
-    geocodeTimer.current = setTimeout(() => geocode(latVal, lngVal), 600);
-  }, [geocode]);
+    geocodeTimer.current = setTimeout(() => geocodeQuick(latVal, lngVal), 600);
+  }, [geocodeQuick]);
 
-  // Acquire GPS on mount
+  // GPS acquisition on mount
   useEffect(() => {
     if (!navigator.geolocation) {
       setGpsStatus("denied");
-      geocode(DEFAULT_LAT, DEFAULT_LNG);
+      geocodeAndDetect(DEFAULT_LAT, DEFAULT_LNG);
       return;
     }
     navigator.geolocation.getCurrentPosition(
@@ -64,20 +90,38 @@ export default function ParkPage() {
         const { latitude, longitude } = pos.coords;
         setLat(latitude);
         setLng(longitude);
-        setFlySeq((s) => s + 1); // fly map to GPS location
+        setFlySeq((s) => s + 1);
         setGpsStatus("ready");
-        geocode(latitude, longitude);
+        geocodeAndDetect(latitude, longitude);
       },
       () => {
         setGpsStatus("denied");
-        geocode(DEFAULT_LAT, DEFAULT_LNG);
+        geocodeAndDetect(DEFAULT_LAT, DEFAULT_LNG);
       },
-      { enableHighAccuracy: true, timeout: 8000 }
+      { enableHighAccuracy: true, timeout: 10000 }
     );
-  }, [geocode]);
+  }, [geocodeAndDetect]);
+
+  function retryGps() {
+    if (!navigator.geolocation) return;
+    setGpsStatus("acquiring");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setLat(latitude);
+        setLng(longitude);
+        setFlySeq((s) => s + 1);
+        setGpsStatus("ready");
+        geocodeAndDetect(latitude, longitude);
+      },
+      () => setGpsStatus("denied"),
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
 
   async function handleConfirm() {
-    if (!streetAddress || !streetSide) return;
+    const streetName = geocodeResult?.streetName;
+    if (!streetName || !streetSide) return;
     setSubmitStatus("loading");
     setErrorMsg("");
 
@@ -85,7 +129,6 @@ export default function ParkPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { router.push("/login"); return; }
 
-    // Find the user's car
     const { data: subs } = await supabase
       .from("car_subscriptions")
       .select("car_id")
@@ -93,22 +136,20 @@ export default function ParkPage() {
       .limit(1)
       .single();
 
-    if (!subs?.car_id) {
-      router.push("/setup");
-      return;
-    }
+    if (!subs?.car_id) { router.push("/setup"); return; }
 
-    // Fetch cleaning schedule & compute next move time
-    const windows  = await fetchCleaningSchedule(streetAddress, streetSide);
+    const windows  = await fetchCleaningSchedule(streetName, streetSide);
     const moveDate = nextMoveAt(windows);
 
-    // Insert parking log — trigger will deactivate prior logs automatically
+    // Store the full display address (with house number) in the log
+    const displayAddress = geocodeResult?.displayAddress || streetName;
+
     const { error } = await supabase.from("parking_logs").insert({
       car_id:         subs.car_id,
       logged_by:      user.id,
       latitude:       lat,
       longitude:      lng,
-      street_address: streetAddress,
+      street_address: displayAddress,
       street_side:    streetSide,
       next_move_at:   moveDate?.toISOString() ?? null,
     });
@@ -120,7 +161,6 @@ export default function ParkPage() {
     }
 
     setSubmitStatus("success");
-    // Brief success pause, then return to dashboard
     setTimeout(() => router.push("/"), 1200);
   }
 
@@ -134,10 +174,11 @@ export default function ParkPage() {
     );
   }
 
+  const displayAddress = geocodeResult?.displayAddress ?? "";
+
   return (
     <div className="relative w-full h-[100dvh]">
 
-      {/* ── Map — crosshair style: map moves, pin stays centred ── */}
       <ParkingMap
         lat={lat}
         lng={lng}
@@ -171,12 +212,32 @@ export default function ParkPage() {
         </div>
       </div>
 
-      {/* ── GPS acquiring banner ── */}
+      {/* ── GPS status banners ── */}
       {gpsStatus === "acquiring" && (
         <div className="absolute top-20 inset-x-0 z-10 flex justify-center pointer-events-none">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[--color-primary] text-white text-xs font-semibold shadow-md">
             <Loader2 size={12} className="animate-spin" />
-            Locating you…
+            Finding your location…
+          </div>
+        </div>
+      )}
+
+      {gpsStatus === "denied" && (
+        <div className="absolute top-20 inset-x-0 z-10 flex justify-center px-4 pointer-events-none">
+          <div
+            className="flex items-center gap-3 px-4 py-2.5 rounded-[var(--radius-lg)] text-xs font-semibold shadow-md pointer-events-auto max-w-sm w-full"
+            style={{ background: "rgba(250,248,244,0.96)", border: "1px solid var(--color-border)" }}
+          >
+            <LocateOff size={14} className="text-[--color-danger] flex-shrink-0" />
+            <span className="text-[--color-text-secondary] flex-1">
+              Location access is off — move the map to your street manually.
+            </span>
+            <button
+              onClick={retryGps}
+              className="text-[--color-primary] font-bold whitespace-nowrap hover:underline"
+            >
+              Try again
+            </button>
           </div>
         </div>
       )}
@@ -214,28 +275,13 @@ export default function ParkPage() {
                 <p className="text-sm font-bold text-[--color-text-primary] truncate">
                   {geocodeStatus === "loading"
                     ? "Resolving address…"
-                    : streetAddress || "Move the map to set location"
+                    : displayAddress || "Move the map to set location"
                   }
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  if (navigator.geolocation) {
-                    setGpsStatus("acquiring");
-                    navigator.geolocation.getCurrentPosition(
-                      (pos) => {
-                        setLat(pos.coords.latitude);
-                        setLng(pos.coords.longitude);
-                        setFlySeq((s) => s + 1); // fly map to new GPS fix
-                        setGpsStatus("ready");
-                        geocode(pos.coords.latitude, pos.coords.longitude);
-                      },
-                      () => setGpsStatus("denied"),
-                      { enableHighAccuracy: true }
-                    );
-                  }
-                }}
+                onClick={retryGps}
                 className="flex-shrink-0 w-8 h-8 rounded-full bg-white border border-[--color-border] flex items-center justify-center text-[--color-text-secondary] hover:text-[--color-primary] transition-colors"
                 aria-label="Re-centre on my location"
               >
@@ -249,7 +295,7 @@ export default function ParkPage() {
             <StreetSidePicker
               value={streetSide}
               onChange={setStreetSide}
-              streetAddress={streetAddress}
+              autoDetecting={autoDetecting}
             />
 
             {errorMsg && (
@@ -258,7 +304,6 @@ export default function ParkPage() {
               </p>
             )}
 
-            {/* Confirm button */}
             <Button
               variant="cta"
               size="lg"
@@ -266,9 +311,10 @@ export default function ParkPage() {
               onClick={handleConfirm}
               disabled={
                 submitStatus === "loading" ||
-                !streetAddress ||
+                !geocodeResult?.streetName ||
                 !streetSide ||
-                geocodeStatus === "loading"
+                geocodeStatus === "loading" ||
+                autoDetecting
               }
             >
               {submitStatus === "loading"

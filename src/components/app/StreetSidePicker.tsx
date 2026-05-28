@@ -1,33 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import type { StreetSide } from "@/types";
 
 interface StreetSidePickerProps {
   value: StreetSide | null;
   onChange: (side: StreetSide) => void;
-  /** Pass the geocoded street address to auto-detect orientation */
-  streetAddress?: string;
+  /** True while the parent is computing the auto-detected side */
+  autoDetecting?: boolean;
 }
-
-// ─── Orientation detection ────────────────────────────────────────────────────
-// For NYC: numbered cross streets run roughly E–W → N/S sides are relevant.
-// Avenues, drives, and named N–S streets → E/W sides are relevant.
-
-type Orientation = "EW" | "NS";
-
-function detectOrientation(address: string): Orientation {
-  const s = address.toUpperCase();
-  // Numbered cross streets: "W 84 ST", "E 42 ST", "125 ST" etc.
-  if (/\b(W|E)\s*\d+/.test(s)) return "EW";
-  if (/\b\d+\s*(ST\b|STREET\b)/.test(s)) return "EW";
-  // Avenues, major N-S corridors
-  if (/\b(AVE\b|AVENUE\b|BLVD\b|BOULEVARD\b|BROADWAY|RIVERSIDE|AMSTERDAM|COLUMBUS|LEXINGTON|MADISON|PARK\s+AVE|LENOX|ADAM CLAYTON)/.test(s)) return "NS";
-  // Default: most streets run E-W
-  return "EW";
-}
-
-// ─── Side metadata ────────────────────────────────────────────────────────────
 
 const SIDE_META: Record<StreetSide, { label: string; arrow: string }> = {
   N: { label: "North side", arrow: "↑" },
@@ -36,42 +18,82 @@ const SIDE_META: Record<StreetSide, { label: string; arrow: string }> = {
   W: { label: "West side",  arrow: "←" },
 };
 
-// For E-W streets (N/S sides) and N-S streets (E/W sides)
-const ORIENTATION_SIDES: Record<Orientation, [StreetSide, StreetSide]> = {
-  EW: ["N", "S"],
-  NS: ["E", "W"],
-};
+const ALL_SIDES: StreetSide[] = ["N", "S", "E", "W"];
 
-// ─────────────────────────────────────────────────────────────────────────────
+export function StreetSidePicker({
+  value,
+  onChange,
+  autoDetecting = false,
+}: StreetSidePickerProps) {
+  const [expanded, setExpanded] = useState(false);
 
-export function StreetSidePicker({ value, onChange, streetAddress = "" }: StreetSidePickerProps) {
-  const orientation = detectOrientation(streetAddress);
-  const [sideA, sideB] = ORIENTATION_SIDES[orientation];
-
-  // If a value is selected that doesn't match the detected orientation,
-  // show all four options so the user can always correct it.
-  const showAll = value !== null && value !== sideA && value !== sideB;
-
-  const allSides: StreetSide[] = ["N", "S", "E", "W"];
+  if (autoDetecting) {
+    return (
+      <div className="w-full space-y-2">
+        <p className="text-xs font-semibold text-[--color-text-secondary] uppercase tracking-wide">
+          Which side of the street?
+        </p>
+        <div
+          className="rounded-[var(--radius-lg)] px-4 py-3 flex items-center gap-2"
+          style={{ background: "var(--color-surface-raised)", border: "1px solid var(--color-border)" }}
+        >
+          <div className="w-3 h-3 rounded-full border-2 border-[--color-primary] border-t-transparent animate-spin flex-shrink-0" />
+          <p className="text-sm text-[--color-text-secondary]">Detecting from map…</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="w-full space-y-2.5">
-      <p className="text-xs font-semibold text-[--color-text-secondary] uppercase tracking-wide">
-        Which side of the street?
-      </p>
+    <div className="w-full space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-[--color-text-secondary] uppercase tracking-wide">
+          Which side of the street?
+        </p>
+        {value && !expanded && (
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            className="text-[10px] font-semibold text-[--color-primary] uppercase tracking-wide hover:underline"
+          >
+            Change
+          </button>
+        )}
+      </div>
 
-      {!showAll ? (
-        // ── Two-option layout (primary) ──────────────────────────────────────
-        <div className="grid grid-cols-2 gap-2.5">
-          {([sideA, sideB] as StreetSide[]).map((side) => {
+      {!expanded && value ? (
+        // ── Confirmed state: show selected side prominently ────────────────
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="w-full flex items-center justify-between rounded-[var(--radius-lg)] px-4 py-3 transition-colors"
+          style={{
+            background: "var(--color-primary)",
+            border: "1px solid var(--color-primary)",
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-xl text-white">{SIDE_META[value].arrow}</span>
+            <span className="text-sm font-bold text-white">{SIDE_META[value].label}</span>
+          </div>
+          <span className="text-[11px] font-semibold text-white/60 uppercase tracking-wide">
+            Tap to change
+          </span>
+        </button>
+      ) : (
+        // ── Picker: all four options ───────────────────────────────────────
+        <div className="grid grid-cols-2 gap-2">
+          {ALL_SIDES.map((side) => {
             const { label, arrow } = SIDE_META[side];
             const isActive = value === side;
             return (
               <button
                 key={side}
                 type="button"
-                onClick={() => onChange(side)}
-                aria-label={label}
+                onClick={() => {
+                  onChange(side);
+                  setExpanded(false);
+                }}
                 aria-pressed={isActive}
                 className={cn(
                   "flex flex-col items-center justify-center gap-1 rounded-[var(--radius-lg)] py-4 px-3",
@@ -87,53 +109,12 @@ export function StreetSidePicker({ value, onChange, streetAddress = "" }: Street
             );
           })}
         </div>
-      ) : (
-        // ── Four-option fallback (if selected side is unexpected) ────────────
-        <div className="grid grid-cols-2 gap-2">
-          {allSides.map((side) => {
-            const { label, arrow } = SIDE_META[side];
-            const isActive = value === side;
-            return (
-              <button
-                key={side}
-                type="button"
-                onClick={() => onChange(side)}
-                aria-pressed={isActive}
-                className={cn(
-                  "flex items-center gap-2 rounded-[var(--radius-md)] px-3 py-2.5 border",
-                  "text-xs font-bold transition-all duration-150 active:scale-95",
-                  isActive
-                    ? "bg-[--color-primary] text-white border-[--color-primary]"
-                    : "bg-[--color-surface-raised] border-[--color-border] text-[--color-text-secondary]"
-                )}
-              >
-                <span>{arrow}</span>
-                <span>{label}</span>
-              </button>
-            );
-          })}
-        </div>
       )}
 
-      {/* "Not right?" escape hatch to show all four sides */}
-      {!showAll && (
-        <button
-          type="button"
-          onClick={() => onChange(value === sideA ? sideB : sideA)}  // won't be used, just needs a click target
-          className="hidden"
-          aria-hidden
-        />
-      )}
-
-      {/* Confirmation line */}
-      {value && (
-        <p className="text-xs text-center text-[--color-text-secondary]">
-          Car is parked on the{" "}
-          <strong className="text-[--color-text-primary]">
-            {SIDE_META[value].label.toLowerCase()}
-          </strong>
-        </p>
-      )}
+      {/* Map orientation hint — always shown so users can orient themselves */}
+      <p className="text-[10px] text-center text-[--color-text-muted]">
+        North is the top of the map above
+      </p>
     </div>
   );
 }

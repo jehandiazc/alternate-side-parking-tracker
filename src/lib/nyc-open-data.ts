@@ -157,23 +157,94 @@ export function nextMoveAt(windows: CleaningWindow[], from: Date = new Date()): 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Reverse geocode lat/lng → street address using Nominatim (OSM, free)
+// ─────────────────────────────────────────────────────────────────────────────
+// Reverse geocode lat/lng → address + road centerline using Nominatim (OSM)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function reverseGeocode(lat: number, lng: number): Promise<string> {
-  const res = await fetch(
-    `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`,
-    {
-      headers: { "User-Agent": "ParkShare/1.0 (alternate-side-parking-tracker)" },
-    }
-  );
+export interface GeocodeResult {
+  /** Just the road name, used for NYC Open Data queries: "West 84th Street" */
+  streetName: string;
+  /** House number if Nominatim found one: "155" */
+  houseNumber: string;
+  /** Human-readable address for display: "155 West 84th Street" */
+  displayAddress: string;
+  /**
+   * Road centerline lat/lng at this location (Nominatim zoom=17 road match).
+   * Used by autoDetectSide — falls back to pin coords if lookup fails.
+   */
+  roadLat: number;
+  roadLng: number;
+}
 
-  if (!res.ok) return "";
+const NOMINATIM_HEADERS = {
+  "User-Agent": "ParkShare/1.0 (alternate-side-parking-tracker)",
+};
 
-  const data = await res.json();
-  const addr = data.address ?? {};
+export async function reverseGeocode(lat: number, lng: number): Promise<GeocodeResult> {
+  // Two parallel calls:
+  //   zoom=18 → building-level match (gives house number + street name)
+  //   zoom=17 → road-level match (gives road centerline lat/lng near our point)
+  const [addrRes, roadRes] = await Promise.all([
+    fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=18`,
+      { headers: NOMINATIM_HEADERS }
+    ),
+    fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=17`,
+      { headers: NOMINATIM_HEADERS }
+    ),
+  ]);
 
-  // Build a short street address like "W 84th St"
-  const road = addr.road ?? addr.pedestrian ?? addr.path ?? "";
-  return road;
+  const [addrData, roadData] = await Promise.all([
+    addrRes.ok ? addrRes.json() : null,
+    roadRes.ok ? roadRes.json() : null,
+  ]);
+
+  const addr       = addrData?.address ?? {};
+  const streetName = addr.road ?? addr.pedestrian ?? addr.path ?? "";
+  const houseNumber = addr.house_number ?? "";
+  const displayAddress = houseNumber ? `${houseNumber} ${streetName}` : streetName;
+
+  // Road centerline position — zoom=17 returns the road way near our pin,
+  // giving us a lat/lng on (or very close to) the road's centreline.
+  const roadLat = roadData ? parseFloat(roadData.lat) : lat;
+  const roadLng = roadData ? parseFloat(roadData.lon) : lng;
+
+  return { streetName, houseNumber, displayAddress, roadLat, roadLng };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Auto-detect which side of the street a pin is on.
+//
+// Strategy: compare the pin's coordinates against the road centreline.
+//   E-W street: if pin.lat > road.lat → north side, else south
+//   N-S street: if pin.lng > road.lng → east side,  else west
+//
+// This works because the user places the crosshair on the curb/sidewalk
+// where the car is parked, which is always clearly on one side of the
+// road centreline — no NYC-specific addressing rules needed.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function detectStreetOrientation(streetName: string): "EW" | "NS" {
+  const s = streetName.toUpperCase();
+  // Numbered cross streets → run E-W
+  if (/\b(W|E)\s*\d+/.test(s) || /\b\d+\s*(ST\b|STREET\b)/.test(s)) return "EW";
+  // Avenues and major N-S corridors → run N-S
+  if (
+    /\b(AVE\b|AVENUE\b|BLVD\b|BOULEVARD\b|BROADWAY|RIVERSIDE|AMSTERDAM|COLUMBUS|LEXINGTON|MADISON|LENOX)/.test(s)
+  )
+    return "NS";
+  // Default: assume E-W (most named streets in a dense grid)
+  return "EW";
+}
+
+export function autoDetectSide(
+  pinLat: number,
+  pinLng: number,
+  result: GeocodeResult
+): StreetSide {
+  const orientation = detectStreetOrientation(result.streetName);
+  return orientation === "EW"
+    ? pinLat >= result.roadLat ? "N" : "S"
+    : pinLng >= result.roadLng ? "E" : "W";
 }
