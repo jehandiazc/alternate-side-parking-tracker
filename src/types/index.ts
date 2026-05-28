@@ -19,7 +19,12 @@ export interface ParkingLog {
   logged_by: string;     // user id
   latitude: number;
   longitude: number;
+  /** Road name only — used for DOT API queries: "West 84th Street" */
   street_address: string;
+  /** Full address with house number — shown to users: "155 West 84th Street" */
+  display_address: string;
+  /** House/building number from reverse geocoding: "155" — used for block identification */
+  house_number: string | null;
   street_side: StreetSide;
   next_move_at: string;  // ISO timestamp — when the car must be moved
   is_active: boolean;    // false once superseded by a new log

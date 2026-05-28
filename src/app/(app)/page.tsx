@@ -246,7 +246,7 @@ export default function DashboardPage() {
                         {carName} · parked on
                       </p>
                       <p className="text-sm font-bold text-[--color-text-primary] leading-tight truncate">
-                        {log.street_address}
+                        {log.display_address || log.street_address}
                         <span className="ml-1.5 text-xs font-normal text-[--color-text-secondary]">
                           ({log.street_side} side)
                         </span>

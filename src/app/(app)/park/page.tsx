@@ -138,20 +138,22 @@ export default function ParkPage() {
 
     if (!subs?.car_id) { router.push("/setup"); return; }
 
-    const windows  = await fetchCleaningSchedule(streetName, streetSide);
+    const windows  = await fetchCleaningSchedule(streetName, streetSide, { lat, lng });
     const moveDate = nextMoveAt(windows);
 
-    // Store the full display address (with house number) in the log
-    const displayAddress = geocodeResult?.displayAddress || streetName;
-
     const { error } = await supabase.from("parking_logs").insert({
-      car_id:         subs.car_id,
-      logged_by:      user.id,
-      latitude:       lat,
-      longitude:      lng,
-      street_address: displayAddress,
-      street_side:    streetSide,
-      next_move_at:   moveDate?.toISOString() ?? null,
+      car_id:          subs.car_id,
+      logged_by:       user.id,
+      latitude:        lat,
+      longitude:       lng,
+      // Road name only — used for DOT API queries (must not include house number)
+      street_address:  streetName,
+      // Full address — shown to users so they can find the exact car location
+      display_address: geocodeResult.displayAddress || streetName,
+      // House number stored separately for block-level schedule filtering
+      house_number:    geocodeResult.houseNumber || null,
+      street_side:     streetSide,
+      next_move_at:    moveDate?.toISOString() ?? null,
     });
 
     if (error) {

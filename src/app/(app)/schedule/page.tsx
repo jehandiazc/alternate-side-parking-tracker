@@ -103,7 +103,11 @@ export default function SchedulePage() {
       setState({ status: "fetching", car, log });
 
       try {
-        const windows = await fetchCleaningSchedule(log.street_address, log.street_side);
+        const windows = await fetchCleaningSchedule(
+          log.street_address,
+          log.street_side,
+          { lat: log.latitude, lng: log.longitude }
+        );
         setState({ status: "ready", car, log, windows });
       } catch (err) {
         setState({ status: "error", message: String(err) });
@@ -213,7 +217,7 @@ export default function SchedulePage() {
               {car.name} · parked on
             </p>
             <p className="text-sm font-bold text-[--color-text-primary] truncate">
-              {log.street_address}
+              {log.display_address || log.street_address}
               <span className="ml-1.5 text-xs font-normal text-[--color-text-secondary]">
                 ({log.street_side} side)
               </span>
