@@ -26,6 +26,7 @@ export interface PushNotifState {
   permission: NotificationPermission | "unsupported";
   subscribed: boolean;
   loading: boolean;
+  error?: string;
 }
 
 interface Props {
@@ -98,11 +99,15 @@ export function PushNotificationManager({ onStateChange, onReady }: Props) {
         return;
       }
 
-      // 2. Create push subscription
+      // 2. Drop any existing subscription first — avoids "key mismatch" errors
+      //    when the VAPID key has changed since the last install.
+      const existing = await swReg.current.pushManager.getSubscription();
+      if (existing) await existing.unsubscribe();
+
+      // 3. Create a fresh push subscription with the current VAPID key
       const keyBytes = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
       const subscription = await swReg.current.pushManager.subscribe({
         userVisibleOnly: true,
-        // Cast through unknown to satisfy the strict ArrayBuffer type in some TS configs
         applicationServerKey: keyBytes.buffer as ArrayBuffer,
       });
 
@@ -124,8 +129,9 @@ export function PushNotificationManager({ onStateChange, onReady }: Props) {
 
       setState((s) => ({ ...s, subscribed: true, loading: false }));
     } catch (err) {
-      console.error("[PushNotificationManager] Subscribe failed:", err);
-      setState((s) => ({ ...s, loading: false }));
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[PushNotificationManager] Subscribe failed:", msg);
+      setState((s) => ({ ...s, loading: false, error: msg }));
     }
   }, []);
 

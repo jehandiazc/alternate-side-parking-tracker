@@ -191,25 +191,32 @@ export default function DashboardPage() {
                 ParkShare
               </h1>
             </div>
-            <button
-              aria-label={bellLabel}
-              title={bellLabel}
-              onClick={handleBellClick}
-              disabled={notifState.loading || notifState.permission === "denied"}
-              className={[
-                "pointer-events-auto w-9 h-9 rounded-full backdrop-blur-sm border flex items-center justify-center transition-colors",
-                bellActive
-                  ? "bg-[--color-accent] border-[--color-accent] text-white"
-                  : notifState.permission === "denied"
-                  ? "bg-white/10 border-white/20 text-white/40 cursor-not-allowed"
-                  : "bg-white/15 border-white/20 text-white hover:bg-white/25",
-              ].join(" ")}
-            >
-              {notifState.loading
-                ? <Loader2 size={16} className="animate-spin" />
-                : <BellIcon size={16} />
-              }
-            </button>
+            <div className="flex flex-col items-end gap-1 pointer-events-auto">
+              <button
+                aria-label={bellLabel}
+                title={bellLabel}
+                onClick={handleBellClick}
+                disabled={notifState.loading || notifState.permission === "denied"}
+                className={[
+                  "w-9 h-9 rounded-full backdrop-blur-sm border flex items-center justify-center transition-colors",
+                  bellActive
+                    ? "bg-[--color-accent] border-[--color-accent] text-white"
+                    : notifState.permission === "denied"
+                    ? "bg-white/10 border-white/20 text-white/40 cursor-not-allowed"
+                    : "bg-white/15 border-white/20 text-white hover:bg-white/25",
+                ].join(" ")}
+              >
+                {notifState.loading
+                  ? <Loader2 size={16} className="animate-spin" />
+                  : <BellIcon size={16} />
+                }
+              </button>
+              {notifState.error && (
+                <p className="text-[10px] text-red-300 bg-black/40 rounded px-2 py-0.5 max-w-[180px] text-right leading-snug">
+                  {notifState.error}
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
