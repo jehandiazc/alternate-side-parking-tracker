@@ -56,7 +56,8 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Run on all routes except Next.js internals and static files
-    "/((?!_next/static|_next/image|favicon.ico|icons|manifest.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // Run on all routes except Next.js internals, static files, and API routes
+    // (API routes manage their own auth — cron uses CRON_SECRET, others use Supabase session)
+    "/((?!_next/static|_next/image|favicon.ico|icons|manifest.json|api/|sw\\.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
