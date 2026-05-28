@@ -69,13 +69,11 @@ function CenterTracker({ onChange }: { onChange: (lat: number, lng: number) => v
 }
 
 // ─── Tile URL ─────────────────────────────────────────────────────────────────
-// Stadia Alidade Smooth — shows building footprints, zoom to 20, clean style.
-// API key is optional on localhost; required in production.
+// CARTO Positron — clean light style, no authentication required.
+// Falls back gracefully everywhere (localhost, preview, production).
 
 function tileUrl(): string {
-  const key = process.env.NEXT_PUBLIC_STADIA_API_KEY;
-  const base = "https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}@2x.png";
-  return key && key !== "your_stadia_api_key" ? `${base}?api_key=${key}` : base;
+  return "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -119,10 +117,11 @@ export default function ParkingMap({
       >
         <TileLayer
           url={tileUrl()}
-          maxZoom={20}
-          maxNativeZoom={20}
+          maxZoom={19}
+          maxNativeZoom={19}
           minZoom={10}
-          attribution='&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>, &copy; <a href="https://openmaptiles.org/">OpenMapTiles</a> &copy; <a href="https://openstreetmap.org">OpenStreetMap</a>'
+          subdomains="abcd"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
         />
 
         {/* Dashboard mode: marker + smooth follow */}
