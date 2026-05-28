@@ -69,10 +69,12 @@ function CenterTracker({ onChange }: { onChange: (lat: number, lng: number) => v
 }
 
 // ─── Tile URL ─────────────────────────────────────────────────────────────────
-// CARTO Positron — clean light style, no authentication required.
-// Falls back gracefully everywhere (localhost, preview, production).
+// MapTiler Aquarelle — watercolor style, free tier 100k req/month.
+// Falls back to CARTO Positron if the key is absent (CI, cold preview).
 
 function tileUrl(): string {
+  const key = process.env.NEXT_PUBLIC_MAPTILER_API_KEY;
+  if (key) return `https://api.maptiler.com/maps/aquarelle/{z}/{x}/{y}.png?key=${key}`;
   return "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
 }
 
@@ -117,11 +119,10 @@ export default function ParkingMap({
       >
         <TileLayer
           url={tileUrl()}
-          maxZoom={19}
-          maxNativeZoom={19}
+          maxZoom={20}
+          maxNativeZoom={20}
           minZoom={10}
-          subdomains="abcd"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+          attribution='&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
 
         {/* Dashboard mode: marker + smooth follow */}
