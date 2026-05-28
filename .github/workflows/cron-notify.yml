@@ -1,0 +1,25 @@
+name: Parking Notifications Cron
+
+on:
+  schedule:
+    # Every 15 minutes — fires both night-before (8 PM NYC) and
+    # 2-hours-before notification windows.
+    - cron: "*/15 * * * *"
+  # Allow manual trigger for testing
+  workflow_dispatch:
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Trigger notify endpoint
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/notify")
+          echo "Response status: $STATUS"
+          if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 300 ]; then
+            echo "Notify endpoint returned $STATUS" >&2
+            exit 1
+          fi
