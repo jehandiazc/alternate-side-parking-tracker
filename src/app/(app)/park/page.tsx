@@ -26,6 +26,8 @@ export default function ParkPage() {
   // Map center (follows GPS or user drag)
   const [lat, setLat] = useState(DEFAULT_LAT);
   const [lng, setLng] = useState(DEFAULT_LNG);
+  // Increment to programmatically fly the map to lat/lng (GPS hit, re-centre)
+  const [flySeq, setFlySeq] = useState(0);
 
   const [streetAddress, setStreetAddress] = useState("");
   const [streetSide, setStreetSide]       = useState<StreetSide | null>(null);
@@ -62,6 +64,7 @@ export default function ParkPage() {
         const { latitude, longitude } = pos.coords;
         setLat(latitude);
         setLng(longitude);
+        setFlySeq((s) => s + 1); // fly map to GPS location
         setGpsStatus("ready");
         geocode(latitude, longitude);
       },
@@ -138,6 +141,7 @@ export default function ParkPage() {
       <ParkingMap
         lat={lat}
         lng={lng}
+        flySeq={flySeq}
         className="absolute inset-0 w-full h-full z-0"
         onCenterChange={(newLat, newLng) => {
           setLat(newLat);
@@ -223,6 +227,7 @@ export default function ParkPage() {
                       (pos) => {
                         setLat(pos.coords.latitude);
                         setLng(pos.coords.longitude);
+                        setFlySeq((s) => s + 1); // fly map to new GPS fix
                         setGpsStatus("ready");
                         geocode(pos.coords.latitude, pos.coords.longitude);
                       },
@@ -241,9 +246,11 @@ export default function ParkPage() {
             <div className="border-t border-[--color-border]" />
 
             {/* Street side picker */}
-            <div className="flex justify-center">
-              <StreetSidePicker value={streetSide} onChange={setStreetSide} />
-            </div>
+            <StreetSidePicker
+              value={streetSide}
+              onChange={setStreetSide}
+              streetAddress={streetAddress}
+            />
 
             {errorMsg && (
               <p className="text-xs text-[--color-danger] bg-[--color-danger-light] rounded-[var(--radius-sm)] px-3 py-2">

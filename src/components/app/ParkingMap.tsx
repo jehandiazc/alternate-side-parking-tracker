@@ -5,7 +5,7 @@ import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-lea
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-// ─── Custom car marker (used on the dashboard) ───────────────────────────────
+// ─── Custom car marker ───────────────────────────────────────────────────────
 
 const CAR_ICON = L.divIcon({
   className: "",
@@ -24,13 +24,13 @@ const CAR_ICON = L.divIcon({
 });
 
 // ─── FlyTo: smoothly recentres the map when lat/lng props change ─────────────
+// Used on the dashboard — fires on every prop change.
 
 function FlyTo({ lat, lng }: { lat: number; lng: number }) {
   const map = useMap();
   const isFirst = useRef(true);
   useEffect(() => {
     if (isFirst.current) {
-      // First render — jump instantly, no animation
       map.setView([lat, lng], 17);
       isFirst.current = false;
     } else {
@@ -40,8 +40,23 @@ function FlyTo({ lat, lng }: { lat: number; lng: number }) {
   return null;
 }
 
+// ─── ProgrammaticFlyTo: fires only when `seq` increments ────────────────────
+// Used on the park page for GPS acquisition and re-centre button.
+// seq=0 is the initial no-op (MapContainer centre handles that).
+
+function ProgrammaticFlyTo({ lat, lng, seq }: { lat: number; lng: number; seq: number }) {
+  const map = useMap();
+  const prevSeq = useRef(-1);
+  useEffect(() => {
+    if (seq > 0 && seq !== prevSeq.current) {
+      prevSeq.current = seq;
+      map.flyTo([lat, lng], 18, { duration: 1.0 });
+    }
+  }, [seq, lat, lng, map]);
+  return null;
+}
+
 // ─── CenterTracker: fires onCenterChange as the user drags the map ──────────
-// Used in "crosshair" mode (/park) so we always know where the pin is.
 
 function CenterTracker({ onChange }: { onChange: (lat: number, lng: number) => void }) {
   useMapEvents({
@@ -53,6 +68,16 @@ function CenterTracker({ onChange }: { onChange: (lat: number, lng: number) => v
   return null;
 }
 
+// ─── Tile URL ─────────────────────────────────────────────────────────────────
+// Stadia Alidade Smooth — shows building footprints, zoom to 20, clean style.
+// API key is optional on localhost; required in production.
+
+function tileUrl(): string {
+  const key = process.env.NEXT_PUBLIC_STADIA_API_KEY;
+  const base = "https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}@2x.png";
+  return key && key !== "your_stadia_api_key" ? `${base}?api_key=${key}` : base;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface ParkingMapProps {
@@ -62,6 +87,11 @@ interface ParkingMapProps {
   /** Park page: hide the marker, show a fixed crosshair, track map centre */
   showCrosshair?: boolean;
   onCenterChange?: (lat: number, lng: number) => void;
+  /**
+   * Park page: increment seq to programmatically fly to lat/lng.
+   * seq=0 → no-op (initial render). seq>0 → fly.
+   */
+  flySeq?: number;
 }
 
 export default function ParkingMap({
@@ -70,6 +100,7 @@ export default function ParkingMap({
   className = "",
   showCrosshair = false,
   onCenterChange,
+  flySeq = 0,
 }: ParkingMapProps) {
   const markerRef = useRef<L.Marker>(null);
 
@@ -87,17 +118,14 @@ export default function ParkingMap({
         style={{ width: "100%", height: "100%", background: "#e8e0d0" }}
       >
         <TileLayer
-          url="https://tiles.stadiamaps.com/tiles/stamen_watercolor/{z}/{x}/{y}.jpg"
-          maxZoom={18}
-          minZoom={10}
-        />
-        <TileLayer
-          url="https://tiles.stadiamaps.com/tiles/stamen_toner_labels/{z}/{x}/{y}.png"
+          url={tileUrl()}
           maxZoom={20}
-          opacity={0.55}
+          maxNativeZoom={20}
+          minZoom={10}
+          attribution='&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>, &copy; <a href="https://openmaptiles.org/">OpenMapTiles</a> &copy; <a href="https://openstreetmap.org">OpenStreetMap</a>'
         />
 
-        {/* Dashboard mode: show pinned car marker */}
+        {/* Dashboard mode: marker + smooth follow */}
         {!showCrosshair && (
           <>
             <Marker position={[lat, lng]} icon={CAR_ICON} ref={markerRef} />
@@ -105,23 +133,22 @@ export default function ParkingMap({
           </>
         )}
 
-        {/* Park mode: track centre as user drags */}
-        {showCrosshair && onCenterChange && (
-          <CenterTracker onChange={onCenterChange} />
+        {/* Park mode: programmatic GPS fly-to + centre tracking */}
+        {showCrosshair && (
+          <>
+            <ProgrammaticFlyTo lat={lat} lng={lng} seq={flySeq} />
+            {onCenterChange && <CenterTracker onChange={onCenterChange} />}
+          </>
         )}
       </MapContainer>
 
-      {/* Fixed crosshair overlay for the park page */}
+      {/* Fixed crosshair overlay */}
       {showCrosshair && (
         <div
           className="absolute inset-0 z-[400] pointer-events-none flex items-center justify-center"
           aria-hidden
         >
-          {/* Drop shadow ring */}
-          <div
-            className="relative"
-            style={{ filter: "drop-shadow(0 4px 12px rgba(45,53,97,0.45))" }}
-          >
+          <div style={{ filter: "drop-shadow(0 4px 12px rgba(45,53,97,0.45))" }}>
             <svg viewBox="0 0 48 56" fill="none" width="48" height="56">
               <path
                 d="M24 0C14.06 0 6 8.06 6 18C6 31.5 24 56 24 56C24 56 42 31.5 42 18C42 8.06 33.94 0 24 0Z"
