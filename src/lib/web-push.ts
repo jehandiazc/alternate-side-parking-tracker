@@ -1,11 +1,19 @@
 import webpush from "web-push";
 
-// Configure once at module load — safe for server-side use in Next.js API routes
-webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT!,
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-);
+// Lazily configured on first call — avoids build-time errors when VAPID env
+// vars are absent (e.g. during `next build` on CI without secrets).
+let _configured = false;
+function ensureConfigured() {
+  if (_configured) return;
+  const subject   = process.env.VAPID_SUBJECT;
+  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const privateKey = process.env.VAPID_PRIVATE_KEY;
+  if (!subject || !publicKey || !privateKey) {
+    throw new Error("VAPID env vars (VAPID_SUBJECT, NEXT_PUBLIC_VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY) are not set.");
+  }
+  webpush.setVapidDetails(subject, publicKey, privateKey);
+  _configured = true;
+}
 
 export interface PushPayload {
   title: string;
@@ -32,6 +40,7 @@ export async function sendPushNotification(
   target: PushTarget,
   payload: PushPayload
 ): Promise<void> {
+  ensureConfigured();
   await webpush.sendNotification(
     {
       endpoint: target.endpoint,
