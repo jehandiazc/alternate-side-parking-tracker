@@ -76,22 +76,22 @@ export default function LoginPage() {
 
   // Auto-submit once the user stops typing (debounced) — supports 6 or 8 digit codes
   function handleCodeChange(value: string) {
-    const digits = value.replace(/\D/g, "").slice(0, 8);
+    const digits = value.replace(/\D/g, "").slice(0, 6);
     setCode(digits);
     setErrorMsg("");
 
-    // Auto-submit: wait 600ms after the last keystroke so partial codes don't fire early
-    if (digits.length >= 6) {
+    // Auto-submit: wait 400ms after the last keystroke so the digit
+    // visually appears and the user can see the complete code before submit
+    if (digits.length === 6) {
       setTimeout(() => {
         setCode((current) => {
           if (current === digits) {
-            // Still the same value — user has stopped typing, submit
             const form = codeInputRef.current?.closest("form");
             form?.requestSubmit();
           }
           return current;
         });
-      }, 600);
+      }, 400);
     }
   }
 
@@ -230,7 +230,7 @@ export default function LoginPage() {
                   placeholder="123456"
                   value={code}
                   onChange={(e) => handleCodeChange(e.target.value)}
-                  maxLength={8}
+                  maxLength={6}
                   className="w-full h-12 pl-9 pr-4 rounded-[var(--radius-md)] border border-[--color-border] bg-[--color-background] text-xl font-bold tracking-[0.3em] text-[--color-text-primary] placeholder:text-[--color-text-muted] placeholder:font-normal placeholder:tracking-normal focus:outline-none focus:ring-2 focus:ring-[--color-primary] focus:border-transparent transition"
                 />
               </div>
@@ -247,7 +247,7 @@ export default function LoginPage() {
               variant="cta"
               size="lg"
               className="w-full"
-              disabled={status === "loading" || code.length < 6}
+              disabled={status === "loading" || code.length !== 6}
             >
               {status === "loading" ? (
                 <Loader2 size={18} className="animate-spin" />
