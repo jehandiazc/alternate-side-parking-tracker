@@ -35,12 +35,18 @@ interface Props {
   onReady?: (requestAndSubscribe: () => Promise<void>) => void;
 }
 
-const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!;
+// Sanitize: strip any wrapping quotes and whitespace that may have been
+// captured by Vercel CLI when the env var was set.
+const VAPID_PUBLIC_KEY = (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "")
+  .trim()
+  .replace(/^["']|["']$/g, "");
 
 /** Convert a base64url VAPID public key to the Uint8Array that pushManager expects */
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  // Defensive: strip anything outside the base64url alphabet
+  const clean = base64String.replace(/[^A-Za-z0-9_-]/g, "");
+  const padding = "=".repeat((4 - (clean.length % 4)) % 4);
+  const base64 = (clean + padding).replace(/-/g, "+").replace(/_/g, "/");
   const rawData = atob(base64);
   return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
 }
@@ -95,6 +101,17 @@ export function PushNotificationManager({ onStateChange, onReady }: Props) {
     setState((s) => ({ ...s, loading: true }));
 
     try {
+      // 0. Sanity check on the VAPID key — a P-256 base64url public key
+      //    must be exactly 87 characters. Anything else means the env var
+      //    is misconfigured and atob() will fail with a cryptic error.
+      if (!VAPID_PUBLIC_KEY) {
+        throw new Error("VAPID public key is missing from build");
+      }
+      if (VAPID_PUBLIC_KEY.length !== 87) {
+        throw new Error(`VAPID key length is ${VAPID_PUBLIC_KEY.length}, expected 87`);
+      }
+      console.log("[PushNotificationManager] VAPID key length:", VAPID_PUBLIC_KEY.length);
+
       // 1. Drop any existing subscription first — avoids "key mismatch" errors
       //    when the VAPID key has changed since the last install.
       const existing = await swReg.current.pushManager.getSubscription();

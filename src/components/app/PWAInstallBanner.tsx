@@ -27,6 +27,12 @@ export function PWAInstallBanner() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   useEffect(() => {
+    // Allow ?reset to clear the dismissed flag — useful for re-onboarding
+    // after deleting and reinstalling the PWA from the home screen.
+    if (new URLSearchParams(window.location.search).has("reset")) {
+      localStorage.removeItem("pwa-banner-dismissed");
+    }
+
     // Don't show if already installed or user dismissed before
     if (isStandalone()) return;
     if (localStorage.getItem("pwa-banner-dismissed")) return;
