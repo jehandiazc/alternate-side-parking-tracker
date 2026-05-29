@@ -90,26 +90,26 @@ export function PushNotificationManager({ onStateChange, onReady }: Props) {
     setState((s) => ({ ...s, loading: true }));
 
     try {
-      // 1. Request permission
-      const permission = await Notification.requestPermission();
-      setState((s) => ({ ...s, permission }));
-
-      if (permission !== "granted") {
-        setState((s) => ({ ...s, loading: false }));
-        return;
-      }
-
-      // 2. Drop any existing subscription first — avoids "key mismatch" errors
+      // 1. Drop any existing subscription first — avoids "key mismatch" errors
       //    when the VAPID key has changed since the last install.
       const existing = await swReg.current.pushManager.getSubscription();
       if (existing) await existing.unsubscribe();
 
-      // 3. Create a fresh push subscription with the current VAPID key
+      // 2. Create a fresh push subscription.
+      //    On iOS Safari PWA, pushManager.subscribe() handles the permission
+      //    prompt internally — calling Notification.requestPermission() first
+      //    throws "Can't find variable: notification" due to a WebKit bug.
+      //    On other browsers, subscribe() also implicitly requests permission.
       const keyBytes = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
       const subscription = await swReg.current.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: keyBytes.buffer as ArrayBuffer,
       });
+
+      // Sync the permission state after subscribe (works on all platforms)
+      if (typeof Notification !== "undefined") {
+        setState((s) => ({ ...s, permission: Notification.permission }));
+      }
 
       const json = subscription.toJSON();
 
