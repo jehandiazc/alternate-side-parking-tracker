@@ -86,6 +86,11 @@ export function PushNotificationManager({ onStateChange, onReady }: Props) {
       console.warn("[PushNotificationManager] SW not registered yet");
       return;
     }
+    if (!swReg.current.pushManager) {
+      console.warn("[PushNotificationManager] Push API not available — open as PWA from home screen");
+      setState((s) => ({ ...s, loading: false, error: "Open the app from your home screen to enable notifications." }));
+      return;
+    }
 
     setState((s) => ({ ...s, loading: true }));
 
