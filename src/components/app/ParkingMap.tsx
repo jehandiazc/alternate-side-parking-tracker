@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -80,6 +80,14 @@ function tileUrl(): string {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Vehicle details shown when the marker is tapped/hovered on the dashboard. */
+export interface MapCarDetails {
+  name: string;
+  make?: string | null;
+  model?: string | null;
+  color?: string | null;
+}
+
 interface ParkingMapProps {
   lat: number;
   lng: number;
@@ -92,6 +100,8 @@ interface ParkingMapProps {
    * seq=0 → no-op (initial render). seq>0 → fly.
    */
   flySeq?: number;
+  /** Dashboard: show the car's name + make/model/color on the marker. */
+  carDetails?: MapCarDetails;
 }
 
 export default function ParkingMap({
@@ -101,8 +111,14 @@ export default function ParkingMap({
   showCrosshair = false,
   onCenterChange,
   flySeq = 0,
+  carDetails,
 }: ParkingMapProps) {
   const markerRef = useRef<L.Marker>(null);
+
+  // "Silver Honda Civic" — only the parts that are filled in.
+  const carSpec = carDetails
+    ? [carDetails.color, carDetails.make, carDetails.model].filter(Boolean).join(" ")
+    : "";
 
   return (
     <div className={`relative ${className}`}>
@@ -128,7 +144,29 @@ export default function ParkingMap({
         {/* Dashboard mode: marker + smooth follow */}
         {!showCrosshair && (
           <>
-            <Marker position={[lat, lng]} icon={CAR_ICON} ref={markerRef} />
+            <Marker position={[lat, lng]} icon={CAR_ICON} ref={markerRef}>
+              {carDetails && (
+                <>
+                  {/* Desktop: name on hover */}
+                  <Tooltip direction="top" offset={[0, -52]} opacity={1}>
+                    {carDetails.name}
+                  </Tooltip>
+                  {/* Tap (works on mobile): full details */}
+                  <Popup offset={[0, -44]} closeButton={false}>
+                    <div style={{ textAlign: "center", lineHeight: 1.3 }}>
+                      <div style={{ fontWeight: 800, color: "#2D3561", fontSize: 14 }}>
+                        🚗 {carDetails.name}
+                      </div>
+                      {carSpec && (
+                        <div style={{ fontSize: 12, color: "#6b6b7a", marginTop: 2 }}>
+                          {carSpec}
+                        </div>
+                      )}
+                    </div>
+                  </Popup>
+                </>
+              )}
+            </Marker>
             <FlyTo lat={lat} lng={lng} />
           </>
         )}
