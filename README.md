@@ -12,13 +12,14 @@ A free, public Progressive Web App for NYC roommates to coordinate alternate sid
 ▶️ **Try the live app:** https://alternate-side-parking-tracker.vercel.app
 
 <p align="center">
-  <img src="docs/images/login.png" width="46%" alt="ParkShare sign-in — email one-time code" />
-  &nbsp;&nbsp;
-  <img src="docs/images/invite.png" width="46%" alt="Invite to join a shared car's crew" />
+  <img src="docs/images/map-view.jpg" width="85%" alt="ParkShare dashboard — live map showing the parked car, the street it's on, and the move-by time" />
 </p>
 
-<!-- Tip: a dashboard/map screenshot or a short demo GIF would round this out —
-     drop files under docs/images/ and add them here. -->
+<p align="center">
+  <img src="docs/images/login.png" width="32%" alt="Sign in with an email one-time code" />
+  &nbsp;&nbsp;
+  <img src="docs/images/invite.png" width="32%" alt="Invite a roommate to join the car's crew" />
+</p>
 
 ## What It Does
 
