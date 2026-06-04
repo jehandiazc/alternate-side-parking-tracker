@@ -58,6 +58,43 @@ links). In the Supabase dashboard:
      your domain in production).
    - **Redirect URLs**: add your dev and production origins.
 
+### Production email (custom SMTP) — do this before any public launch
+
+Out of the box, Supabase sends auth emails through its **built-in shared email
+service**, which is intentionally crippled for production use:
+
+- It's rate-limited to a **handful of emails per hour** (a few messages —
+  meant for development only), and
+- it's **best-effort delivery with no guarantees** (Supabase's own docs say not
+  to rely on it for production).
+
+Since ParkShare logs users in with an emailed OTP code, this is a hard ceiling:
+if several people sign up in the same hour, their codes simply never arrive and
+sign-in appears broken. **If you're sharing the app with more than a couple of
+people at once, configure a custom SMTP provider first.**
+
+1. Create an account with any transactional email provider — e.g.
+   [Resend](https://resend.com), [Postmark](https://postmarkapp.com), or
+   [Amazon SES](https://aws.amazon.com/ses/). Their free tiers are far more
+   generous than Supabase's built-in sender.
+2. **Verify your sending domain** with the provider (add the DNS records they
+   give you). Deliverability is poor until the domain is verified, and OTP codes
+   are exactly the kind of mail that lands in spam without it.
+3. In Supabase, go to **Authentication → Emails → SMTP Settings** (in some
+   dashboards: **Project Settings → Auth → SMTP**), enable **Custom SMTP**, and
+   fill in the host, port, username, and password from your provider. Set the
+   sender address to one on your verified domain.
+4. While you're there, raise the auth **rate limits**
+   (**Authentication → Rate Limits**) — the default email cap stays low until
+   custom SMTP is enabled.
+5. Send yourself a test sign-in code to confirm the code (not a link) arrives
+   from your domain.
+
+> Tip for a short demo: even on a free SMTP tier, verifying the domain and
+> enabling custom SMTP is the single biggest reliability win for a public
+> launch — it's the difference between "the login is broken" and "it just
+> works."
+
 ---
 
 ## 2. MapTiler (map tiles)
@@ -150,6 +187,7 @@ You can trigger it manually from the Actions tab (`workflow_dispatch`) to test.
 | --- | --- |
 | Map shows "Invalid key" | MapTiler key missing, or your origin isn't in the key's Allowed Origins. |
 | New signups get a *link*, not a code | "Confirm email" is still on in Supabase, or the Magic Link template wasn't switched to `{{ .Token }}`. |
+| OTP code emails stop arriving under load | You're still on Supabase's built-in email sender, which caps at a few emails/hour. Configure custom SMTP (see §1). |
 | Stuck on login after deploy | Supabase **Site URL / Redirect URLs** don't include the deployed domain. |
 | Push notifications never arrive | VAPID keys mismatched, or the cron `CRON_SECRET`/`APP_URL` secrets aren't set. |
 | Dashboard shows "Where's the car?" right after parking | A saved log with no street-cleaning schedule still shows as parked with a "no schedule found" state — that's expected, not a save failure. |
