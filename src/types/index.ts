@@ -8,6 +8,9 @@ export interface Car {
   id: string;
   name: string;          // e.g. "The Civic", "The Beast"
   license_plate?: string;
+  make?: string | null;  // e.g. "Honda"
+  model?: string | null; // e.g. "Civic"
+  color?: string | null; // e.g. "Silver"
   created_by: string;    // user id
   created_at: string;
   invite_code: string;
@@ -48,6 +51,17 @@ export interface CarSubscription {
   notify_morning_of: boolean;       // 7 AM same day
   created_at: string;
   profile?: Profile;
+}
+
+// A single member of a car's crew — returned by the get_car_crew RPC.
+// Intentionally PII-free: display name + avatar only, never email or raw UUID
+// (the user_id is opaque and used only as a React key / removal target).
+export interface CrewMember {
+  user_id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  is_owner: boolean;
+  joined_at: string;
 }
 
 export interface PushSubscription {

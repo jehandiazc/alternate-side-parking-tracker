@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MapPin, Bell, BellOff, BellRing, Clock, Sparkles, AlertCircle, Navigation, Loader2 } from "lucide-react";
+import { MapPin, Bell, BellOff, BellRing, Clock, Sparkles, AlertCircle, Navigation, Loader2, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { formatMoveTime, formatCountdown } from "@/lib/utils";
@@ -166,6 +166,7 @@ export default function DashboardPage() {
           lat={log.latitude}
           lng={log.longitude}
           className="absolute inset-0 w-full h-full z-0"
+          carDetails={car ? { name: carName, make: car.make, model: car.model, color: car.color } : undefined}
         />
       ) : (
         <div className="absolute inset-0 bg-[#e8e0d0] z-0" />
@@ -240,7 +241,7 @@ export default function DashboardPage() {
               boxShadow: "0 8px 32px rgba(26,26,46,0.18), 0 2px 8px rgba(26,26,46,0.10), 0 0 0 1px rgba(26,26,46,0.06)",
             }}
           >
-            {log && moveAt ? (
+            {log ? (
               <div className="p-4 space-y-3">
                 {/* Street + navigate */}
                 <div className="flex items-center justify-between gap-3">
@@ -279,18 +280,22 @@ export default function DashboardPage() {
                     <span className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
                       isSuspended ? "bg-[--color-success-light]"
                       : isUrgent  ? "bg-[--color-danger-light]"
-                      : "bg-[--color-accent-light]"
+                      : moveAt    ? "bg-[--color-accent-light]"
+                      : "bg-[--color-surface-raised]"
                     }`}>
                       {isSuspended ? <Sparkles size={14} className="text-[#4a7a3a]" />
                       : isUrgent   ? <AlertCircle size={14} className="text-[--color-danger]" />
-                      : <Clock size={14} className="text-[--color-accent-hover]" />}
+                      : moveAt     ? <Clock size={14} className="text-[--color-accent-hover]" />
+                      : <HelpCircle size={14} className="text-[--color-text-muted]" />}
                     </span>
                     <div>
                       <p className="text-[10px] font-semibold text-[--color-text-muted] uppercase tracking-wide leading-none mb-0.5">
-                        {isSuspended ? "Suspended" : "Move by"}
+                        {isSuspended ? "Suspended" : moveAt ? "Move by" : "Move time"}
                       </p>
                       <p className="text-sm font-bold text-[--color-text-primary] leading-tight">
-                        {isSuspended ? "No need to move 🎉" : formatMoveTime(moveAt)}
+                        {isSuspended ? "No need to move 🎉"
+                        : moveAt ? formatMoveTime(moveAt)
+                        : "No schedule found — check the signs"}
                       </p>
                     </div>
                   </div>
@@ -298,10 +303,12 @@ export default function DashboardPage() {
                     <Badge variant="success"><Sparkles size={10} />Holiday!</Badge>
                   ) : isUrgent ? (
                     <Badge variant="danger"><AlertCircle size={10} />Move Soon</Badge>
-                  ) : (
+                  ) : moveAt ? (
                     <span className="text-xs font-medium text-[--color-text-secondary] whitespace-nowrap">
                       {formatCountdown(moveAt)}
                     </span>
+                  ) : (
+                    <Badge variant="muted">Unknown</Badge>
                   )}
                 </div>
 

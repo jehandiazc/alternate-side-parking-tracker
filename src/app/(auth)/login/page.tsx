@@ -9,6 +9,15 @@ import { Mail, Hash, Loader2, ArrowLeft } from "lucide-react";
 type Step = "email" | "code";
 type Status = "idle" | "loading" | "error";
 
+// Where to send the user after sign-in. Honors a ?next= param (e.g. from an
+// invite link) but only allows internal relative paths to prevent open redirects.
+function getNextPath(): string {
+  if (typeof window === "undefined") return "/";
+  const next = new URLSearchParams(window.location.search).get("next");
+  if (next && next.startsWith("/") && !next.startsWith("//")) return next;
+  return "/";
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [step, setStep] = useState<Step>("email");
@@ -68,8 +77,8 @@ export default function LoginPage() {
       setCode("");
       setTimeout(() => codeInputRef.current?.focus(), 50);
     } else {
-      // Session is set — go to the app
-      router.push("/");
+      // Session is set — go to the app (or back to the invite link that sent us here)
+      router.push(getNextPath());
       router.refresh();
     }
   }

@@ -60,8 +60,8 @@ src/
 
 ## Phases
 
-- [ ] **Phase 1** — Core loop: log parking, schedule lookup, push notifications
-- [ ] **Phase 2** — Social layer: auth, car subscriptions, invite links, real-time sync
+- [x] **Phase 1** — Core loop: log parking, schedule lookup, push notifications
+- [x] **Phase 2** — Social layer: auth, car subscriptions, invite links, real-time sync
 - [ ] **Phase 3** — Intelligence: 311 holiday feed, notification preferences, parking history
 - [ ] **Phase 4** — Polish: animations, micro-interactions, lock screen widget
 
