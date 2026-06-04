@@ -65,6 +65,10 @@ src/
 - [ ] **Phase 3** — Intelligence: 311 holiday feed, notification preferences, parking history
 - [ ] **Phase 4** — Polish: animations, micro-interactions, lock screen widget
 
+## Deployment
+
+Hosted on Vercel with GitHub integration: pushes to `main` deploy to production, and every pull request gets its own preview deployment.
+
 ## Contributing
 
 This is a public, free app. PRs welcome.
