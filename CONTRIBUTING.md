@@ -1,29 +1,38 @@
-# Git Workflow
+# Contributing to ParkShare
 
-## Branch Structure
+Thanks for your interest! ParkShare is a free, public PWA and PRs are welcome.
+New here? Start with [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md) to run your own
+instance, and [ROADMAP.md](ROADMAP.md) for what needs building.
 
-```
-main          ← production-ready code only. Protected — no direct pushes.
-└── develop   ← integration branch. All feature branches merge here first.
-    ├── feat/parking-logger
-    ├── feat/nyc-open-data-integration
-    ├── fix/notification-timing
-    └── ...
-```
+## Workflow
 
-## Day-to-Day Flow
+`main` is the source of truth and is always production-ready. Hosting is wired to
+GitHub: **merging to `main` deploys production, and every pull request gets its
+own preview deployment** automatically.
 
-### 1. Always branch off `develop`
+1. **Branch off `main`:**
+   ```bash
+   git checkout main
+   git pull origin main
+   git checkout -b feat/your-feature-name
+   ```
+2. **Make your change.** Keep it focused. Run the checks below before pushing.
+3. **Open a pull request → `main`.** A Vercel preview is created automatically —
+   use it to verify your change in a real deploy.
+4. **Merge once it's green and reviewed.** Production deploys from `main` on merge.
+
+## Before you push
 
 ```bash
-git checkout develop
-git pull origin develop
-git checkout -b feat/your-feature-name
+npm run lint        # eslint
+npx tsc --noEmit    # type check
+npm run build       # production build
 ```
 
-### 2. Keep commits clean and conventional
+## Commit conventions
 
-Format: `type: short description (present tense, lowercase)`
+Format: `type: short description` (present tense, lowercase). Add a longer body
+when useful.
 
 | Type | When to use |
 |------|-------------|
@@ -39,29 +48,25 @@ Examples:
 ```
 feat: add GPS pin drop to parking logger
 fix: correct 311 feed date parsing for holiday suspensions
-chore: add web-push vapid key generation script
+docs: document VAPID key generation
 ```
 
-### 3. Merge into `develop` via PR
-
-- Open a pull request from your feature branch → `develop`
-- PRs to `develop` don't require review (solo dev) but should pass any CI checks
-- Squash commits if the branch history is noisy
-
-### 4. Promote `develop` → `main` only when ready
-
-- `main` is protected — direct pushes are blocked
-- Open a PR from `develop` → `main` only when:
-  - The feature/fix has been tested locally
-  - The build passes
-  - Behavior has been manually verified
-- Use a descriptive PR title: `Release: phase 1 core loop`
-
-## Branch Naming
+## Branch naming
 
 ```
-feat/short-description       ← new features
-fix/short-description        ← bug fixes
-chore/short-description      ← tooling/config
-release/v1.0.0               ← release candidates
+feat/short-description     ← new features
+fix/short-description      ← bug fixes
+chore/short-description    ← tooling/config
+docs/short-description     ← documentation
 ```
+
+## Database changes
+
+Schema lives in `supabase/migrations/`. Add a new timestamped migration file
+rather than editing existing ones, and follow the existing RLS patterns (see
+[docs/SELF_HOSTING.md](docs/SELF_HOSTING.md) for how migrations are applied).
+
+## Code of Conduct
+
+By participating you agree to uphold our
+[Code of Conduct](CODE_OF_CONDUCT.md).

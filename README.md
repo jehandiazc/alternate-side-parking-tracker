@@ -2,21 +2,37 @@
 
 A free, public Progressive Web App for NYC roommates to coordinate alternate side parking without the mental overhead.
 
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/jehandiazc/alternate-side-parking-tracker&env=NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,SUPABASE_SERVICE_ROLE_KEY,NEXT_PUBLIC_MAPTILER_API_KEY,NYC_OPEN_DATA_APP_TOKEN,NEXT_PUBLIC_VAPID_PUBLIC_KEY,VAPID_PRIVATE_KEY,VAPID_SUBJECT,CRON_SECRET&envDescription=API%20keys%20required%20to%20run%20ParkShare&envLink=https://github.com/jehandiazc/alternate-side-parking-tracker/blob/main/docs/SELF_HOSTING.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-F0A500.svg)](LICENSE)
+
+> The Deploy button sets up hosting; you'll still provision Supabase and the API keys — see [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md).
+
+## Demo
+
+▶️ **Try the live app:** https://alternate-side-parking-tracker.vercel.app
+
+<!--
+  Add a screenshot or demo GIF here once recorded, e.g.:
+  ![ParkShare dashboard](docs/images/dashboard.png)
+  Tip: drag an image into a GitHub issue/PR to get a hosted URL, or commit
+  files under docs/images/.
+-->
+
 ## What It Does
 
 - **Track your car's location** — drop a pin every time it's parked
 - **Auto-calculate move times** — pulls NYC street cleaning schedules from Open Data
 - **Holiday intelligence** — syncs with the NYC 311 suspension calendar so you never get an unnecessary alert
-- **Shared cars** — invite roommates via magic link; everyone sees the same real-time status
+- **Shared cars** — invite roommates with a link or code; everyone sees the same real-time status
 - **Push notifications** — get alerted the night before and 2 hours before the car needs to move
 - **Zero friction** — designed to be as fast as tapping a button
 
 ## Tech Stack
 
-- **Frontend:** Next.js 15 (App Router) — PWA
-- **Database & Auth:** Supabase (magic link email auth, real-time subscriptions)
-- **Notifications:** Web Push API via Supabase Edge Functions
-- **Data:** NYC Open Data (street cleaning schedules) + NYC 311 suspension feed
+- **Frontend:** Next.js 16 (App Router) — PWA
+- **Database & Auth:** Supabase (email one-time-code auth, real-time subscriptions, RLS)
+- **Notifications:** Web Push API (VAPID), scheduled via a GitHub Actions cron
+- **Data:** NYC Open Data (street cleaning schedules) + NYC 311 suspension feed *(Phase 3)*
 - **Deployment:** Vercel
 
 ## Design
