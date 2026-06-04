@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Self-hosting help
+    url: https://github.com/jehandiazc/alternate-side-parking-tracker/blob/main/docs/SELF_HOSTING.md
+    about: Setting up your own instance? Start with the self-hosting guide.
+  - name: Roadmap & open tasks
+    url: https://github.com/jehandiazc/alternate-side-parking-tracker/blob/main/ROADMAP.md
+    about: Looking for something to build? See the roadmap.
