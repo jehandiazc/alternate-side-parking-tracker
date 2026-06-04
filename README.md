@@ -37,12 +37,14 @@ cp .env.example .env.local
 npm run dev
 ```
 
+ParkShare depends on a few free services (Supabase, MapTiler, NYC Open Data,
+Web Push). For a complete walkthrough of provisioning them and standing up your
+own instance, see **[docs/SELF_HOSTING.md](docs/SELF_HOSTING.md)**.
+
 ## Environment Variables
 
-See `.env.example` for required keys:
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `NYC_OPEN_DATA_APP_TOKEN`
+See [`.env.example`](.env.example) for the full list (each documented inline);
+[docs/SELF_HOSTING.md](docs/SELF_HOSTING.md) explains where to obtain each one.
 
 ## Project Structure
 
@@ -58,12 +60,14 @@ src/
 └── styles/               # Global styles, design tokens
 ```
 
-## Phases
+## Roadmap
 
 - [x] **Phase 1** — Core loop: log parking, schedule lookup, push notifications
 - [x] **Phase 2** — Social layer: auth, car subscriptions, invite links, real-time sync
 - [ ] **Phase 3** — Intelligence: 311 holiday feed, notification preferences, parking history
 - [ ] **Phase 4** — Polish: animations, micro-interactions, lock screen widget
+
+See **[ROADMAP.md](ROADMAP.md)** for the detailed breakdown and open tasks.
 
 ## Deployment
 
@@ -71,4 +75,9 @@ Hosted on Vercel with GitHub integration: pushes to `main` deploy to production,
 
 ## Contributing
 
-This is a public, free app. PRs welcome.
+This is a public, free app — PRs welcome! See [CONTRIBUTING.md](CONTRIBUTING.md)
+to get started, and [ROADMAP.md](ROADMAP.md) for what needs building.
+
+## License
+
+[MIT](LICENSE) © Jehan Diaz
